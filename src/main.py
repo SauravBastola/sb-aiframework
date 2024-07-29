@@ -14,10 +14,7 @@ from agents import (
     DQNAgent,
     RandomAgent,
     GymAgent,
-    TSDQNAgent,
     BaselineBotAgent,
-    TSA2CAgent,
-    TSPPOAgent,
 )
 from envs import ProbeEnv1, BhoosGameEnv
 from GameInfo import GameInfo
@@ -40,32 +37,6 @@ def create_agent(agent, env: BhoosGameEnv, config: Dict):
             variant.action_space.n,
             config["hidden_layer_size"],
         )
-    elif agent == "TSDQN":
-        return TSDQNAgent(variant.observation_space, variant.action_space)
-    elif agent == "TSA2C":
-        full_state_space = variant.full_state_space
-
-        if full_state_space != None:
-            assert isinstance(full_state_space, gymnasium.spaces.Discrete)
-            return TSA2CAgent(
-                variant.observation_space,
-                variant.action_space,
-                use_full_state_critic=(env, full_state_space),
-            )
-        else:
-            return TSA2CAgent(variant.observation_space, variant.action_space)
-    elif agent == "TSPPO":
-        full_state_space = variant.full_state_space
-
-        if full_state_space != None:
-            assert isinstance(full_state_space, gymnasium.spaces.Discrete)
-            return TSPPOAgent(
-                variant.observation_space,
-                variant.action_space,
-                use_full_state_critic=(env, full_state_space),
-            )
-        else:
-            return TSPPOAgent(variant.observation_space, variant.action_space)
     else:
         raise Exception("Invalid agent name")
 
