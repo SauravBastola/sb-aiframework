@@ -1,0 +1,8 @@
+[porject]
+name = "ai-trainer"
+description = "The trainer code for Bhoos AI framework"
+requires-python = "==3.11"
+
+[tool.black]
+line-length = 88
+target-version = ['py311']
