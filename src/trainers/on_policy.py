@@ -48,6 +48,7 @@ def train_on_policy(
         for agent_idx, r in enumerate(total_reward):
             avg_total_reward[agent_idx] += r
             if episode % 50 == 0:
+                agent = agents[agent_idx]
                 logger.report_scalar(
                     title="Reward",
                     series=agent.__repr__(),
