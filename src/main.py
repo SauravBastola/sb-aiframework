@@ -41,202 +41,6 @@ def create_agent(agent, env: BhoosGameEnv, config: Dict):
         raise Exception("Invalid agent name")
 
 
-@app.command(name="train")
-def train_command(eps: int = 10_000, log: bool = False, agent: str = "DQN"):
-    variant = GameInfo()
-    env = BhoosGameEnv(variant)
-    assert isinstance(variant.action_space, gymnasium.spaces.Discrete)
-    assert isinstance(variant.observation_space, gymnasium.spaces.Discrete)
-
-    config = {
-        "num_players": variant.num_players,
-        "hidden_layer_size": 64,
-        "episodes": eps,
-    }
-
-    random_id = "".join(random.choices(string.ascii_lowercase, k=8))
-    task_name = f"{variant.name}-{random_id}"
-    if log:
-        task: Task | None = Task.init(
-            project_name=f"{variant.game_name}",
-            task_name=task_name,
-            reuse_last_task_id=False,
-        )
-        task.connect_configuration(config, "GameInfo")
-    else:
-        task = None
-
-    lagent = create_agent(agent, env, config)
-    ragents = [RandomAgent() for _ in range(variant.num_players - 1)]
-    agents = [lagent, *ragents]
-
-    # callback function for saving the model
-    def save_model(episode):
-        if episode % 200_000 == 0:
-            lagent.save_model(f"../models/{task_name}-{episode}")
-
-    for agent in agents:
-        if isinstance(agent, GymAgent):
-            agent.start()
-
-    train_on_policy(env, agents, config["episodes"], on_episode_complete=save_model)
-
-    for agent in agents:
-        if isinstance(agent, GymAgent):
-            agent.stop()
-
-    # Test and log, plot results
-    test_episodes = 1000
-    rewards = test(env, agents, test_episodes)
-    for idx, agent in enumerate(agents):
-        title = "Avg. Test Reward " + agent.__repr__()
-        avg = np.sum(rewards[idx]) / test_episodes
-        print(title, avg)
-        if task:
-            task.get_logger().report_single_value(title, avg)
-
-    plot_reward_histograms(rewards, [agent.__repr__() for agent in agents])
-
-    lagent.save_model(f"../models/{task_name}")
-
-
-@app.command(name="retrain")
-def retrain_command(model: str, eps: int = 10_000, log: bool = False):
-    model_path = model
-
-    variant = GameInfo()
-    env = BhoosGameEnv(variant)
-    assert isinstance(variant.action_space, gymnasium.spaces.Discrete)
-    assert isinstance(variant.observation_space, gymnasium.spaces.Discrete)
-
-    config = {
-        "num_players": variant.num_players,
-        "base_model": model_path.split("/")[-1],
-        "hidden_layer_size": 64,
-        "episodes": eps,
-    }
-
-    random_id = "".join(random.choices(string.ascii_lowercase, k=8))
-    task_name = f"{variant.name}-{random_id}"
-    if log:
-        task: Task | None = Task.init(
-            project_name=f"{variant.game_name}",
-            task_name=task_name,
-            reuse_last_task_id=False,
-        )
-        task.connect_configuration(config, "GameInfo")
-    else:
-        task = None
-
-    agent = "DQN"
-    if len(sys.argv) > 3:
-        agent = sys.argv[3]
-
-    lagent = create_agent(agent, env, config)
-    ragents = [RandomAgent() for _ in range(variant.num_players - 1)]
-    agents = [lagent, *ragents]
-    lagent.load_model(model_path)
-
-    # callback function for saving the model
-    def save_model(episode):
-        if episode % 200_000 == 0:
-            lagent.save_model(f"../models/{task_name}-{episode}")
-
-    for agent in agents:
-        if isinstance(agent, GymAgent):
-            agent.start()
-
-    train_on_policy(env, agents, config["episodes"], on_episode_complete=save_model)
-
-    for agent in agents:
-        if isinstance(agent, GymAgent):
-            agent.stop()
-    # Test and log, plot results
-    test_episodes = 1000
-    rewards = test(env, agents, test_episodes)
-    for idx, agent in enumerate(agents):
-        title = "Avg. Test Reward " + agent.__repr__()
-        avg = np.sum(rewards[idx]) / test_episodes
-        print(title, avg)
-        if task:
-            task.get_logger().report_single_value(title, avg)
-
-    plot_reward_histograms(rewards, [agent.__repr__() for agent in agents])
-
-    lagent.save_model(f"../models/{task_name}")
-
-
-@app.command("test")
-def test_command(model: str, eps: int = 1_000, agent: str = "DQN"):
-    model_path = model
-
-    variant = GameInfo()
-    env = BhoosGameEnv(variant)
-    assert isinstance(variant.action_space, gymnasium.spaces.Discrete)
-    assert isinstance(variant.observation_space, gymnasium.spaces.Discrete)
-
-    config = {
-        "hidden_layer_size": 64,
-    }
-    lagent = create_agent(agent, env, config)
-    ragents = [RandomAgent() for _ in range(variant.num_players - 1)]
-    agents = [lagent, *ragents]
-    lagent.load_model(model_path)
-
-    test_episodes = eps
-    rewards = test(env, agents, test_episodes)
-
-    for idx, agent in enumerate(agents):
-        avg = np.sum(rewards[idx]) / test_episodes
-        print("Avg. Test Reward " + agent.__repr__(), avg)
-
-    plot_reward_histograms(rewards, [agent.__repr__() for agent in agents])
-
-
-@app.command(name="test-baseline")
-def test_baseline_command(model: str, eps: int = 1_000, agent: str = "DQN"):
-    model_path = model
-
-    variant = GameInfo()
-    env = BhoosGameEnv(variant)
-    assert isinstance(variant.action_space, gymnasium.spaces.Discrete)
-    assert isinstance(variant.observation_space, gymnasium.spaces.Discrete)
-
-    config = {
-        "hidden_layer_size": 64,
-    }
-    lagent = create_agent(agent, env, config)
-    bagents = [BaselineBotAgent(env) for _ in range(variant.num_players - 1)]
-    agents = [lagent, *bagents]
-    lagent.load_model(model_path)
-
-    test_episodes = 5000
-    rewards = test(env, agents, test_episodes)
-
-    for idx, agent in enumerate(agents):
-        avg = np.sum(rewards[idx]) / test_episodes
-        print("Avg. Test Reward " + agent.__repr__(), avg)
-
-    plot_reward_histograms(rewards, [agent.__repr__() for agent in agents])
-
-
-@app.command("probe1")
-def probe1_command():
-    lagent = DQNAgent(1, 1, 4)
-    lagent.update_batch_size = 1
-    p1 = ProbeEnv1()
-    train_on_policy(p1, [lagent], 2000)
-
-    value = lagent._value([0], 0).item()
-    ok = abs(value - 1) < 0.01
-
-    print(f"Expected value = 1 Learned = {value}")
-    print("OK" if ok else "Not OK")
-
-    if not ok:
-        exit(1)
-
-
 class PettingZooEnvs(str, Enum):
     t3 = "t3"
     texas_holem = "texas-holdem"
@@ -358,6 +162,23 @@ def petting_zoo_test(
         print("Avg. Test Reward " + agent.__repr__(), avg)
 
     plot_reward_histograms(rewards, [agent.__repr__() for agent in agents])
+
+
+@app.command("probe1")
+def probe1_command():
+    lagent = DQNAgent(1, 1, 4)
+    lagent.update_batch_size = 1
+    p1 = ProbeEnv1()
+    train_on_policy(p1, [lagent], 2000)
+
+    value = lagent._value([0], 0).item()
+    ok = abs(value - 1) < 0.01
+
+    print(f"Expected value = 1 Learned = {value}")
+    print("OK" if ok else "Not OK")
+
+    if not ok:
+        exit(1)
 
 
 if __name__ == "__main__":
