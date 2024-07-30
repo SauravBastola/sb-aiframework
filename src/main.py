@@ -76,7 +76,7 @@ def petting_zoo(
 
     random_id = "".join(random.choices(string.ascii_lowercase, k=8))
 
-    task_name = f"texasholdem-{random_id}"
+    task_name = f"{env_name}-{random_id}"
     if log:
         task: Task | None = Task.init(
             project_name="petting-zoo-" + env_name,
