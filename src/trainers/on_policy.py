@@ -20,6 +20,7 @@ def train_on_policy(
     for idx, agent in enumerate(env.possible_agents):
         agents_map[agent] = idx
 
+    avg_total_reward = [0.0 for _ in range(env.max_num_agents)]
     for episode in tqdm(range(1, episodes + 1)):
         env.reset()
         total_reward = [0.0 for i in range(env.num_agents)]
@@ -42,9 +43,16 @@ def train_on_policy(
         # callback function
         on_episode_complete(episode)
 
+        if not Logger:
+            return
         for agent_idx, r in enumerate(total_reward):
-            agent = agents[agent_idx]
-            if logger:
+            avg_total_reward[agent_idx] += r
+            if episode % 50 == 0:
                 logger.report_scalar(
-                    title="Reward", series=agent.__repr__(), value=r, iteration=episode
+                    title="Reward",
+                    series=agent.__repr__(),
+                    value=avg_total_reward[agent_idx] / 50,
+                    iteration=episode,
                 )
+
+                avg_total_reward[agent_idx] = 0.0
