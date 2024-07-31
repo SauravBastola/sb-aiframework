@@ -121,7 +121,7 @@ def petting_zoo(
     lagent.save_model(f"../models/{task_name}")
 
 
-@app.command("ptest")
+@app.command("pztest")
 def petting_zoo_test(
     env_name: PettingZooEnvs,
     eps: int = 10_000,
