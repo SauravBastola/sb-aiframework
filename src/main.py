@@ -46,7 +46,7 @@ class PettingZooEnvs(str, Enum):
     texas_holem = "texas-holdem"
 
 
-@app.command("petting-zoo")
+@app.command("pztrain")
 def petting_zoo(
     env_name: PettingZooEnvs,
     eps: int = 10_000,
@@ -76,7 +76,7 @@ def petting_zoo(
 
     random_id = "".join(random.choices(string.ascii_lowercase, k=8))
 
-    task_name = f"{env_name}-{random_id}"
+    task_name = env_name + "-" + random_id
     if log:
         task: Task | None = Task.init(
             project_name="petting-zoo-" + env_name,
@@ -121,7 +121,7 @@ def petting_zoo(
     lagent.save_model(f"../models/{task_name}")
 
 
-@app.command("petting-zoo-test")
+@app.command("ptest")
 def petting_zoo_test(
     env_name: PettingZooEnvs,
     eps: int = 10_000,
@@ -129,7 +129,6 @@ def petting_zoo_test(
 ):
     from pettingzoo.classic import texas_holdem_v4, tictactoe_v3
 
-    # env = texas_holdem_v4.env(render_mode="human")
     if env_name == "texas-holdem":
         env = texas_holdem_v4.env()
         obs_space = 72
@@ -148,8 +147,7 @@ def petting_zoo_test(
         "episodes": eps,
     }
 
-    # lagent = DQNAgent(obs_space, action_space, config["hidden_layer_size"])
-    lagent = RandomAgent()
+    lagent = DQNAgent(obs_space, action_space, config["hidden_layer_size"])
     ragents = [RandomAgent() for _ in range(env.max_num_agents - 1)]
     agents = [lagent, *ragents]
 
