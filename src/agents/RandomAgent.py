@@ -6,8 +6,9 @@ from .Agent import Agent
 
 
 class RandomAgent(Agent):
-    def __init__(self):
+    def __init__(self, id):
         self.eps = None
+        self.id = id
         pass
 
     def get_action(self, obs: ObsType) -> ActionType:
@@ -18,7 +19,7 @@ class RandomAgent(Agent):
         pass
 
     def __repr__(self):
-        return "RandomAgent"
+        return "RandomAgent-" + self.id
 
 
 def random_choice(action_mask: list[int]):

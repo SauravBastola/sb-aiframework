@@ -88,8 +88,8 @@ def petting_zoo(
         task = None
 
     lagent = DQNAgent(obs_space, action_space, config["hidden_layer_size"])
-    ragents = [RandomAgent() for _ in range(env.max_num_agents - 1)]
-    agents = [lagent, *ragents]
+    ragents = [RandomAgent("r" + str(_)) for _ in range(env.max_num_agents - 1)]
+    agents = [*ragents, lagent]
 
     # callback function for saving the model
     def save_model(episode):
@@ -148,7 +148,7 @@ def petting_zoo_test(
     }
 
     lagent = DQNAgent(obs_space, action_space, config["hidden_layer_size"])
-    ragents = [RandomAgent() for _ in range(env.max_num_agents - 1)]
+    ragents = [RandomAgent(id="r" + str(_)) for _ in range(env.max_num_agents - 1)]
     agents = [lagent, *ragents]
 
     # Test and log, plot results
