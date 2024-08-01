@@ -47,11 +47,11 @@ def train_on_policy_sa(
             continue
 
         avg_total_reward += total_reward
-        if episode % 5 == 0:
+        if episode % 10 == 0:
             logger.report_scalar(
                 title="Reward",
                 series=agent.__repr__(),
-                value=avg_total_reward / 5,
+                value=avg_total_reward / 10,
                 iteration=episode,
             )
 
