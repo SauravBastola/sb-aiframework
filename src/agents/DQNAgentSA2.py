@@ -136,7 +136,7 @@ class DQNAgentSA2(Agent):
             print("Couldn't find model!")
 
     def __repr__(self):
-        return f"DQNAgent({self.q_net.__repr__()})"
+        return f"DQNAgent2({self.q_net.__repr__()})"
 
 
 def valid_actions_from_action_mask(action_mask: list[int]):
