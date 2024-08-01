@@ -69,7 +69,8 @@ class DQNAgentSA(Agent):
                 li.append(arr)
 
             obs = li
-
+        else:
+            obs = [np.array(obs)]
         s = np.concatenate(obs)
 
         if self.TRAIN and np.random.random() < self.eps:
@@ -108,6 +109,10 @@ class DQNAgentSA(Agent):
                     arr[obs_next[idx]] = 1.0
                 li_next.append(arr)
             obs_next = li_next
+
+        else:
+            obs = [np.array(obs)]
+            obs_next = [np.array(obs_next)]
 
         s = np.concatenate(obs)
         s_next = np.concatenate(obs_next)

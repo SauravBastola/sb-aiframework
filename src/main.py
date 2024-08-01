@@ -10,7 +10,8 @@ import numpy as np
 import typer
 from enum import Enum
 
-from agents import DQNAgentSA, DQNAgentMA, RandomAgentSA, RandomAgentMA
+from agents import DQNAgentSA, DQNAgentSA2, RandomAgentSA
+from agents import DQNAgentMA, RandomAgentMA
 from envs import ProbeEnv1, BhoosGameEnv
 from trainers import train_on_policy_sa, train_on_policy_ma
 from test_sa import test_sa, plot_reward_histograms_sa
@@ -20,17 +21,14 @@ from test_ma import test_ma, plot_reward_histograms_ma
 app = typer.Typer()
 
 
-def create_agent(agent, env: BhoosGameEnv, config: Dict):
-    variant = env.game_variant
-
-    assert isinstance(variant.action_space, gymnasium.spaces.Discrete)
-    assert isinstance(variant.observation_space, gymnasium.spaces.Discrete)
-
+def create_agent_sa(agent, obs_space, action_space, state_shape, config: Dict):
     if agent == "DQN":
-        return DQNAgentMA(
-            variant.observation_space.n,
-            variant.action_space.n,
-            config["hidden_layer_size"],
+        return DQNAgentSA(
+            obs_space, action_space, config["hidden_layer_size"], state_shape
+        )
+    elif agent == "DQN2":
+        return DQNAgentSA2(
+            obs_space, action_space, config["hidden_layer_size"], state_shape
         )
     else:
         raise Exception("Invalid agent name")
@@ -126,9 +124,7 @@ def gymnasium_env(
     else:
         task = None
 
-    lagent = DQNAgentSA(
-        obs_space, action_space, config["hidden_layer_size"], state_shape=state_shape
-    )
+    lagent = create_agent_sa(agent, obs_space, action_space, state_shape, config)
 
     # callback function for saving the model
     def save_model(episode):

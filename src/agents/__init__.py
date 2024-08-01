@@ -1,6 +1,7 @@
 from .Agent import Agent
 from .GymAgent import GymAgent
 from .DQNAgentSA import DQNAgentSA
+from .DQNAgentSA2 import DQNAgentSA2
 from .DQNAgentMA import DQNAgentMA
 from .RandomAgentSA import RandomAgentSA
 from .RandomAgentMA import RandomAgentMA
