@@ -8,7 +8,7 @@ from agents import Agent
 from tqdm import tqdm
 
 
-def test(env: Env, agents: list[Agent], episodes: int):
+def test_ma(env: Env, agents: list[Agent], episodes: int):
     for agent in agents:
         agent.TRAIN = False
 
@@ -37,7 +37,7 @@ def test(env: Env, agents: list[Agent], episodes: int):
     return rewards
 
 
-def plot_reward_histograms(rewards: np.ndarray, titles=None):
+def plot_reward_histograms_ma(rewards: np.ndarray, titles=None):
     [agents, episodes] = rewards.shape
     fig, axes = plt.subplots(1, agents, sharex=True, sharey=True)
 

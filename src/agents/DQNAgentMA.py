@@ -8,7 +8,7 @@ from envs import ObsType, ActionType
 from utils import ensure_path_parents
 
 from .Agent import Agent
-from .RandomAgent import random_choice
+from .RandomAgentMA import random_choice
 
 
 class Network(nn.Module):
@@ -28,7 +28,7 @@ class Network(nn.Module):
         return f"{self.fc1.in_features} -> {self.fc2.in_features} -> {self.fc3.in_features} -> {self.fc3.out_features})"
 
 
-class DQNAgent(Agent):
+class DQNAgentMA(Agent):
     TRAIN: bool = True
 
     def __init__(self, state_input_size, action_input_size, hidden_size, eps=0.1):

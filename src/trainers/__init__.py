@@ -1,1 +1,2 @@
-from .on_policy import train_on_policy
+from .on_policy_sa import train_on_policy_sa
+from .on_policy_ma import train_on_policy_ma

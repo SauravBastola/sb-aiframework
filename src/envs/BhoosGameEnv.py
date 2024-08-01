@@ -83,6 +83,7 @@ class BhoosGameEnv(Env):
         self.infos = {agent: {} for agent in self.agents}
 
     def observe(self, agent: AgentID) -> ObsType:
+        print("I am called")
         res = self.socket.req(f"observe/{self.instance_id}/{agent}")
         state: list[int] = res["state"]
         valid_actions: list[int] = res["validActions"]

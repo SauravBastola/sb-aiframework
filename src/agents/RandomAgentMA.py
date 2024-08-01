@@ -5,7 +5,7 @@ from envs import ObsType, ActionType
 from .Agent import Agent
 
 
-class RandomAgent(Agent):
+class RandomAgentMA(Agent):
     def __init__(self, id):
         self.eps = None
         self.id = id
@@ -19,7 +19,7 @@ class RandomAgent(Agent):
         pass
 
     def __repr__(self):
-        return "RandomAgent-" + self.id
+        return "RandomAgentMA-" + self.id
 
 
 def random_choice(action_mask: list[int]):

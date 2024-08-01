@@ -7,7 +7,7 @@ from utils import rotate_list
 from typing import Callable
 
 
-def train_on_policy(
+def train_on_policy_ma(
     env: Env,
     agents: list[Agent],
     episodes,
@@ -43,8 +43,8 @@ def train_on_policy(
         # callback function
         on_episode_complete(episode)
 
-        if not Logger:
-            return
+        if not logger:
+            continue
         for agent_idx, r in enumerate(total_reward):
             avg_total_reward[agent_idx] += r
             if episode % 50 == 0:
