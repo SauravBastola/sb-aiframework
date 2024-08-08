@@ -40,7 +40,6 @@ class DQNAgentSA(Agent):
         self.action_input_size = action_input_size
         self.q_net = Network(state_input_size + action_input_size, hidden_size, 1)
         self.optim = torch.optim.Adam(self.q_net.parameters())
-        self.prev_sa = None
         self.gamma = 1
         self.loss = torch.tensor([0], dtype=torch.float32)
         self.updates = 0

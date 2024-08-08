@@ -21,6 +21,12 @@ class RandomAgentMA(Agent):
     def __repr__(self):
         return "RandomAgentMA-" + self.id
 
+    def load_model(self, *args):
+        raise Exception("Can't load weights for a Random Agent")
+
+    def save_model(self, *args):
+        pass
+
 
 def random_choice(action_mask: list[int]):
     actions_count = 0

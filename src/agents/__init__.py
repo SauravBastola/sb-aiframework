@@ -6,3 +6,4 @@ from .DQNAgentMA import DQNAgentMA
 from .RandomAgentSA import RandomAgentSA
 from .RandomAgentMA import RandomAgentMA
 from .BaselineBotAgent import BaselineBotAgent
+from .PGNAgentSA import PGNAgentSA

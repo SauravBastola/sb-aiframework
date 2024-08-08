@@ -10,13 +10,13 @@ import numpy as np
 import typer
 from enum import Enum
 
-from agents import DQNAgentSA, DQNAgentSA2, RandomAgentSA
+from agents import DQNAgentSA, DQNAgentSA2, RandomAgentSA, PGNAgentSA
 from agents import DQNAgentMA, RandomAgentMA
 from envs import ProbeEnv1, BhoosGameEnv
-from trainers import train_on_policy_sa, train_on_policy_ma
-from test_sa import test_sa, plot_reward_histograms_sa
-from test_ma import test_ma, plot_reward_histograms_ma
 
+from trainers import train_on_policy_sa, train_on_policy_ma, train_pgm_sa
+from test_sa import test_sa, test_pgm_sa, plot_reward_histograms_sa
+from test_ma import test_ma, plot_reward_histograms_ma
 
 app = typer.Typer()
 
@@ -26,12 +26,35 @@ def create_agent_sa(agent, obs_space, action_space, state_shape, config: Dict):
         return DQNAgentSA(
             obs_space, action_space, config["hidden_layer_size"], state_shape
         )
+
     elif agent == "DQN2":
         return DQNAgentSA2(
             obs_space, action_space, config["hidden_layer_size"], state_shape
         )
+
+    elif agent == "PGN":
+        return PGNAgentSA(
+            obs_space, action_space, config["hidden_layer_size"], state_shape
+        )
+
+    elif agent == "Random":
+        return RandomAgentSA(id="gym")
     else:
         raise Exception("Invalid agent name")
+
+
+def create_trainer_sa(agent):
+    trainer = train_on_policy_sa
+    if agent == "PGN":
+        trainer = train_pgm_sa
+    return trainer
+
+
+def create_tester_sa(agent):
+    tester = test_sa
+    if agent == "PGN":
+        tester = test_pgm_sa
+    return tester
 
 
 # -------------------------    GYM Environments    -------------------------
@@ -48,46 +71,51 @@ class GymEnvs(str, Enum):
     frozen_lake = "frozen-lake"
 
 
-def make_gym_env(env_name):
+def make_gym_env(env_name, viz):
     import gymnasium as gym
 
+    if viz:
+        render_mode = "human"
+    else:
+        render_mode = None
+
     if env_name == "cartpole":
-        env = gym.make("CartPole-v1")
+        env = gym.make("CartPole-v1", render_mode=render_mode)
         obs_space = 4
         action_space = 2
         state_shape = None
     elif env_name == "mountain-car":
-        env = gym.make("MountainCar-v0")
+        env = gym.make("MountainCar-v0", render_mode=render_mode)
         obs_space = 2
         action_space = 3
         state_shape = None
     elif env_name == "acrobot":
-        env = gym.make("Acrobot-v1")
+        env = gym.make("Acrobot-v1", render_mode=render_mode)
         obs_space = 6
         action_space = 3
         state_shape = None
     elif env_name == "lunar-lander":
-        env = gym.make("LunarLander-v2")
+        env = gym.make("LunarLander-v2", render_mode=render_mode)
         obs_space = 8
         action_space = 4
         state_shape = None
     elif env_name == "blackjack":
-        env = gym.make("Blackjack-v1")
+        env = gym.make("Blackjack-v1", render_mode=render_mode)
         obs_space = 32 + 11 + 2
         action_space = 2
         state_shape = (32, 11, 2)
     elif env_name == "taxi":
-        env = gym.make("Taxi-v3")
+        env = gym.make("Taxi-v3", render_mode=render_mode)
         obs_space = 500
         action_space = 6
         state_shape = [500]
     elif env_name == "cliff-walking":
-        env = gym.make("CliffWalking-v0")
+        env = gym.make("CliffWalking-v0", render_mode=render_mode)
         obs_space = 48
         action_space = 4
-        state_shape = None
+        state_shape = [48]
     elif env_name == "frozen-lake":
-        env = gym.make("FrozenLake-v1")
+        env = gym.make("FrozenLake-v1", render_mode=render_mode)
         obs_space = 16
         action_space = 4
         state_shape = [16]
@@ -102,14 +130,17 @@ def gymnasium_env(
     env_name: GymEnvs,
     eps: int = 500,
     log: bool = False,
+    retrain: bool = False,
+    model: str = "",
     agent: str = "DQN",
+    hidden_size: int = 64,
 ):
-    env, obs_space, action_space, state_shape = make_gym_env(env_name)
+    model_path = model
+    env, obs_space, action_space, state_shape = make_gym_env(env_name, False)
 
-    config = {
-        "hidden_layer_size": 64,
-        "episodes": eps,
-    }
+    config = {"hidden_layer_size": hidden_size, "episodes": eps, "agent": agent}
+    if retrain:
+        config["base_model"] = model_path.split("/")[-1]
 
     random_id = "".join(random.choices(string.ascii_lowercase, k=8))
 
@@ -125,13 +156,16 @@ def gymnasium_env(
         task = None
 
     lagent = create_agent_sa(agent, obs_space, action_space, state_shape, config)
+    if retrain:
+        lagent.load_model(model_path)
 
     # callback function for saving the model
     def save_model(episode):
         if episode % 200_000 == 0:
             lagent.save_model(f"../models/{task_name}-{episode}")
 
-    train_on_policy_sa(env, lagent, config["episodes"], on_episode_complete=save_model)
+    train = create_trainer_sa(agent)
+    train(env, lagent, config["episodes"], on_episode_complete=save_model)
 
     # Test and log, plot results
     test_episodes = 1000
@@ -151,53 +185,36 @@ def gymnasium_env(
 @app.command("gymtest")
 def gymnasium_env_test(
     env_name: GymEnvs,
-    eps: int = 10_000,
+    eps: int = 1_000,
     agent: str = "DQN",
+    model: str = "",
+    viz: bool = False,
+    hidden_size: int = 64,
 ):
-    env, obs_space, action_space, state_shape = make_gym_env(env_name)
+    model_path = model
+    env, obs_space, action_space, state_shape = make_gym_env(env_name, viz)
 
     config = {
-        "hidden_layer_size": 64,
+        "hidden_layer_size": hidden_size,
         "episodes": eps,
     }
 
-    lagent = RandomAgentSA(id="gym")
+    lagent = create_agent_sa(agent, obs_space, action_space, state_shape, config)
+    if model_path != "":
+        lagent.load_model(model_path)
 
     # Test and log, plot results
     test_episodes = eps
-    rewards = test_sa(env, lagent, test_episodes)
+
+    test = create_tester_sa(agent)
+    rewards = test(env, lagent, test_episodes)
     env.close()
 
     avg = np.sum(rewards) / test_episodes
     print("Avg. Test Reward " + lagent.__repr__(), avg)
 
-    plot_reward_histograms_sa(rewards, lagent.__repr__())
-
-
-@app.command("gymtest-viz")
-def gymnasium_env_test_viz(
-    env_name: GymEnvs,
-    eps: int = 10,
-    agent: str = "DQN",
-):
-    import gymnasium as gym
-
-    env, obs_space, action_space, state_shape = make_gym_env(env_name)
-
-    config = {
-        "hidden_layer_size": 64,
-        "episodes": eps,
-    }
-
-    lagent = RandomAgentSA(id="gym")
-
-    # Test and log, plot results
-    test_episodes = eps
-    rewards = test_sa(env, lagent, test_episodes)
-    env.close()
-
-    avg = np.sum(rewards) / test_episodes
-    print("Avg. Test Reward " + lagent.__repr__(), avg)
+    if not viz:
+        plot_reward_histograms_sa(rewards, lagent.__repr__())
 
 
 # ------------------------- PettingZoo Environments -------------------------
@@ -311,9 +328,12 @@ def petting_zoo_test(
     plot_reward_histograms_ma(rewards, [agent.__repr__() for agent in agents])
 
 
-@app.command("probe1")
-def probe1_command():
-    lagent = DQNAgent(1, 1, 4)
+# -------------------------   Probe  Environments   -------------------------
+
+
+@app.command("probe1_ma")
+def probe1ma_command():
+    lagent = DQNAgentMA(1, 1, 4)
     lagent.update_batch_size = 1
     p1 = ProbeEnv1()
     train_on_policy_ma(p1, [lagent], 2000)
