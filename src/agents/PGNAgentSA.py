@@ -101,4 +101,4 @@ class PGNAgentSA(Agent):
             print("Couldn't find model!")
 
     def __repr__(self):
-        return f"DQNAgent({self.policy_net.__repr__()})"
+        return f"PGNAgent({self.policy_net.__repr__()})"
