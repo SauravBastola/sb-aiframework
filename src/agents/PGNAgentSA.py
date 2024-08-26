@@ -71,17 +71,15 @@ class PGNAgentSA(Agent):
         return action.item(), model.log_prob(action)
 
     def update(self, log_probs, rewards):
-        self.scores_deque.append(sum(rewards))
-        self.scores.append(sum(rewards))
-
         discounts = [self.gamma**i for i in range(len(rewards) + 1)]
-        R = sum([a * b for a, b in zip(discounts, rewards)])
+        G_tmp = [a * b for a, b in zip(discounts, rewards)]
+        G = []
+        for i in range(len(G_tmp)):
+            G.append(sum(G_tmp[i:]))
 
-        policy_loss = []
-        for log_prob in log_probs:
-            policy_loss.append(-log_prob * R)
-
-        policy_loss = torch.cat(policy_loss).sum()
+        policy_loss = torch.tensor([0.0])
+        for g, log_prob in zip(G, log_probs):
+            policy_loss += -log_prob * g
 
         # Backprogagation
         self.optim.zero_grad()

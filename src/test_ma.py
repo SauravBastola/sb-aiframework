@@ -8,7 +8,7 @@ from agents import Agent
 from tqdm import tqdm
 
 
-def test_ma(env: Env, agents: list[Agent], episodes: int):
+def test_ma(env: Env, agents, episodes: int):
     for agent in agents:
         agent.TRAIN = False
 
@@ -31,6 +31,35 @@ def test_ma(env: Env, agents: list[Agent], episodes: int):
                 action = agent.get_action(obs)
             else:
                 action = None
+
+            env.step(action)
+
+    return rewards
+
+
+def test_pgm_ma(env: Env, agents, episodes: int):
+    for agent in agents:
+        agent.TRAIN = False
+
+    # Create agents map
+    agents_map = {}
+    for idx, agent in enumerate(env.possible_agents):
+        agents_map[agent] = idx
+
+    rewards = np.zeros([env.max_num_agents, episodes], dtype=np.float32)
+    for episode in tqdm(range(episodes)):
+        env.reset()
+
+        for agent_idx in env.agent_iter():
+            agent = agents[agents_map[agent_idx]]
+            obs, r, terminate, truncate, info = env.last()
+            rewards[agents_map[agent_idx], episode] += r
+
+            assert obs
+            if not (terminate or truncate):
+                action, _ = agent.get_action(obs)
+            else:
+                action, _ = None, None
 
             env.step(action)
 

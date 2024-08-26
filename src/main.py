@@ -10,13 +10,29 @@ import numpy as np
 import typer
 from enum import Enum
 
-from agents import DQNAgentSA, DQNAgentSA2, RandomAgentSA, PGNAgentSA
-from agents import DQNAgentMA, RandomAgentMA
+from agents import (
+    DQNAgentSA,
+    DQNAgentSA2,
+    RandomAgentSA,
+    PGNAgentSA,
+    PGNBaselineAgentSA,
+    DQNAgentMA,
+    DQNAgentMA_Dummy,
+    PGNAgentMA,
+    PGNAgentMA_Dummy,
+    RandomAgentMA,
+)
 from envs import ProbeEnv1, BhoosGameEnv
 
-from trainers import train_on_policy_sa, train_on_policy_ma, train_pgm_sa
+from trainers import (
+    train_on_policy_sa,
+    train_on_policy_ma,
+    train_pgm_sa,
+    train_pgm_ma,
+    train_pgm_baseline_sa,
+)
 from test_sa import test_sa, test_pgm_sa, plot_reward_histograms_sa
-from test_ma import test_ma, plot_reward_histograms_ma
+from test_ma import test_ma, test_pgm_ma, plot_reward_histograms_ma
 
 app = typer.Typer()
 
@@ -37,6 +53,11 @@ def create_agent_sa(agent, obs_space, action_space, state_shape, config: Dict):
             obs_space, action_space, config["hidden_layer_size"], state_shape
         )
 
+    elif agent == "PGNBaseline":
+        return PGNBaselineAgentSA(
+            obs_space, action_space, config["hidden_layer_size"], state_shape
+        )
+
     elif agent == "Random":
         return RandomAgentSA(id="gym")
     else:
@@ -47,12 +68,16 @@ def create_trainer_sa(agent):
     trainer = train_on_policy_sa
     if agent == "PGN":
         trainer = train_pgm_sa
+    elif agent == "PGNBaseline":
+        trainer = train_pgm_baseline_sa
     return trainer
 
 
 def create_tester_sa(agent):
     tester = test_sa
     if agent == "PGN":
+        tester = test_pgm_sa
+    elif agent == "PGNBaseline":
         tester = test_pgm_sa
     return tester
 
@@ -169,7 +194,8 @@ def gymnasium_env(
 
     # Test and log, plot results
     test_episodes = 1000
-    rewards = test_sa(env, lagent, test_episodes)
+    test = create_tester_sa(agent)
+    rewards = test(env, lagent, test_episodes)
     env.close()
     title = "Avg. Test Reward " + lagent.__repr__()
     avg = np.sum(rewards) / test_episodes
@@ -220,21 +246,66 @@ def gymnasium_env_test(
 # ------------------------- PettingZoo Environments -------------------------
 
 
+def create_agent_ma(
+    agent, obs_space, action_space, config: Dict, dummy: bool, parent_agent=None
+):
+    if agent == "DQN":
+        if not dummy:
+            return DQNAgentMA(obs_space, action_space, config["hidden_layer_size"])
+        else:
+            return DQNAgentMA_Dummy(
+                obs_space, action_space, config["hidden_layer_size"], parent_agent
+            )
+
+    elif agent == "PGN":
+        if not dummy:
+            return PGNAgentMA(
+                obs_space, action_space, config["hidden_layer_size"], dummy
+            )
+        else:
+            return PGNAgentMA_Dummy(
+                obs_space, action_space, config["hidden_layer_size"], parent_agent
+            )
+
+    elif agent == "Random":
+        return RandomAgentMA(id="gym")
+    else:
+        raise Exception("Invalid agent name")
+
+
+def create_trainer_ma(agent):
+    trainer = train_on_policy_ma
+    if agent == "PGN":
+        trainer = train_pgm_ma
+    return trainer
+
+
+def create_tester_ma(agent):
+    tester = test_ma
+    if agent == "PGN":
+        tester = test_pgm_ma
+    return tester
+
+
 class PettingZooEnvs(str, Enum):
     t3 = "t3"
     texas_holem = "texas-holdem"
 
 
-def make_petting_zoo_env(env_name):
+def make_petting_zoo_env(env_name, viz):
     from pettingzoo.classic import texas_holdem_v4, tictactoe_v3
 
     # env = texas_holdem_v4.env(render_mode="human")
+    if viz:
+        render_mode = "human"
+    else:
+        render_mode = None
     if env_name == "texas-holdem":
-        env = texas_holdem_v4.env()
+        env = texas_holdem_v4.env(render_mode=render_mode)
         obs_space = 72
         action_space = 4
     elif env_name == "t3":
-        env = tictactoe_v3.env()
+        env = tictactoe_v3.env(render_mode=render_mode)
         obs_space = 18
         action_space = 9
     else:
@@ -249,13 +320,18 @@ def petting_zoo(
     env_name: PettingZooEnvs,
     eps: int = 10_000,
     log: bool = False,
+    retrain: bool = False,
+    model: str = "",
     agent: str = "DQN",
+    hidden_size: int = 64,
+    num_players: int = 2,
 ):
-    env, obs_space, action_space = make_petting_zoo_env(env_name)
+    model_path = model
+    env, obs_space, action_space = make_petting_zoo_env(env_name, False)
 
     config = {
-        "num_players": 2,
-        "hidden_layer_size": 64,
+        "num_players": num_players,
+        "hidden_layer_size": hidden_size,
         "episodes": eps,
     }
 
@@ -272,20 +348,26 @@ def petting_zoo(
     else:
         task = None
 
-    lagent = DQNAgentMA(obs_space, action_space, config["hidden_layer_size"])
-    ragents = [RandomAgentMA("r" + str(_)) for _ in range(env.max_num_agents - 1)]
-    agents = [*ragents, lagent]
+    lagent = create_agent_ma(agent, obs_space, action_space, config, False)
+    ragents = [create_agent_ma(agent, obs_space, action_space, config, True, lagent)]
+    # ragents = [RandomAgentMA("r" + str(_)) for _ in range(env.max_num_agents - 1)]
+    agents = [lagent, *ragents]
+
+    if retrain:
+        lagent.load_model(model_path)
 
     # callback function for saving the model
     def save_model(episode):
         if episode % 200_000 == 0:
             lagent.save_model(f"../models/{task_name}-{episode}")
 
-    train_on_policy_ma(env, agents, config["episodes"], on_episode_complete=save_model)
+    train = create_trainer_ma(agent)
+    train(env, agents, config["episodes"], on_episode_complete=save_model)
 
     # Test and log, plot results
     test_episodes = 1000
-    rewards = test_ma(env, agents, test_episodes)
+    test = create_tester_ma(agent)
+    rewards = test(env, agents, test_episodes)
     for idx, agent in enumerate(agents):
         title = "Avg. Test Reward " + agent.__repr__()
         avg = np.sum(rewards[idx]) / test_episodes
@@ -303,29 +385,40 @@ def petting_zoo_test(
     env_name: PettingZooEnvs,
     eps: int = 10_000,
     agent: str = "DQN",
+    model: str = "",
+    viz: bool = False,
+    hidden_size: int = 64,
+    num_players: int = 2,
 ):
-    env, obs_space, action_space = make_petting_zoo_env(env_name)
+    model_path = model
+    env, obs_space, action_space = make_petting_zoo_env(env_name, viz)
 
     config = {
-        "num_players": 2,
-        "hidden_layer_size": 64,
+        "num_players": num_players,
+        "hidden_layer_size": hidden_size,
         "episodes": eps,
     }
 
-    # lagent = DQNAgentMA(obs_space, action_space, config["hidden_layer_size"])
-    lagent = RandomAgentMA(id="l")
+    lagent = create_agent_ma(agent, obs_space, action_space, config, False)
     ragents = [RandomAgentMA(id="r" + str(_)) for _ in range(env.max_num_agents - 1)]
     agents = [lagent, *ragents]
 
+    if model_path != "":
+        lagent.load_model(model_path)
+
     # Test and log, plot results
     test_episodes = eps
-    rewards = test_ma(env, agents, test_episodes)
+    test = create_tester_ma(agent)
+    rewards = test(env, agents, test_episodes)
+
+    env.close()
 
     for idx, agent in enumerate(agents):
         avg = np.sum(rewards[idx]) / test_episodes
         print("Avg. Test Reward " + agent.__repr__(), avg)
 
-    plot_reward_histograms_ma(rewards, [agent.__repr__() for agent in agents])
+    if not viz:
+        plot_reward_histograms_ma(rewards, [agent.__repr__() for agent in agents])
 
 
 # -------------------------   Probe  Environments   -------------------------

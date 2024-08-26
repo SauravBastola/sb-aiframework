@@ -1,0 +1,150 @@
+import os
+import torch
+import torch.nn as nn
+import numpy as np
+import torch.nn.functional as F
+from torch.distributions import Categorical
+
+from .Agent import Agent
+
+from collections import deque
+
+from utils import ensure_path_parents
+
+
+class PolicyNet(nn.Module):
+
+    def __init__(self, input_size, hidden_size, output_size):
+        super(PolicyNet, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc3 = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        x = F.relu(self.fc1(x))
+        x = F.relu(self.fc2(x))
+        x = F.softmax(self.fc3(x), dim=1)
+        return x
+
+    def __repr__(self) -> str:
+        return f"{self.fc1.in_features} -> {self.fc2.in_features} -> {self.fc3.in_features} -> {self.fc3.out_features})"
+
+
+class BaselineNet(nn.Module):
+
+    def __init__(self, input_size, hidden_size, output_size):
+        super(BaselineNet, self).__init__()
+        self.fc1 = nn.Linear(input_size, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc3 = nn.Linear(hidden_size, output_size)
+
+    def forward(self, x):
+        x = torch.relu(self.fc1(x))
+        x = torch.relu(self.fc2(x))
+        x = self.fc3(x)
+        return x
+
+    def __repr__(self) -> str:
+        return f"{self.fc1.in_features} -> {self.fc2.in_features} -> {self.fc3.in_features} -> {self.fc3.out_features})"
+
+
+class PGNBaselineAgentSA(Agent):
+    TRAIN: bool = True
+
+    def __init__(
+        self,
+        state_input_size,
+        action_input_size,
+        hidden_size,
+        state_shape=None,
+        eps=0.1,
+    ):
+        self.action_input_size = action_input_size
+        self.policy_net = PolicyNet(state_input_size, hidden_size, action_input_size)
+        self.baseline_net = BaselineNet(state_input_size, hidden_size, 1)
+        self.optim = torch.optim.Adam(self.policy_net.parameters())
+        self.baseline_optim = torch.optim.Adam(self.baseline_net.parameters())
+        self.gamma = 1
+        self.state_shape = state_shape
+        self.scores_deque = deque(maxlen=100)
+        self.scores = []
+
+    def get_action(self, obs, actions=None):
+        if self.state_shape:
+            li = []
+            for idx, val in enumerate(self.state_shape):
+                arr = np.zeros(val, dtype=np.float32)
+                if isinstance(obs, int):
+                    arr[obs] = 1.0
+                else:
+                    arr[obs[idx]] = 1.0
+                li.append(arr)
+
+            obs = li
+        else:
+            obs = [np.array(obs)]
+        s = np.concatenate(obs)
+        state = torch.tensor(s).float().unsqueeze(0)
+        probs = self.policy_net.forward(state)
+        model = Categorical(probs)
+        action = model.sample()
+        return action.item(), model.log_prob(action)
+
+    def get_state_value(self, obs):
+        if self.state_shape:
+            li = []
+            for idx, val in enumerate(self.state_shape):
+                arr = np.zeros(val, dtype=np.float32)
+                if isinstance(obs, int):
+                    arr[obs] = 1.0
+                else:
+                    arr[obs[idx]] = 1.0
+                li.append(arr)
+
+            obs = li
+        else:
+            obs = [np.array(obs)]
+        s = np.concatenate(obs)
+        return self.baseline_net.forward(torch.tensor(s))
+
+    def update(self, ep_states, log_probs, rewards):
+        discounts = [self.gamma**i for i in range(len(rewards) + 1)]
+        G_tmp = [a * b for a, b in zip(discounts, rewards)]
+        G = []
+        for i in range(len(G_tmp)):
+            G.append(sum(G_tmp[i:]))
+
+        baseline_loss = torch.tensor([0.0])
+        policy_loss = torch.tensor([0.0])
+        for state, g, log_prob in zip(ep_states, G, log_probs):
+            # print(state, g, log_prob)
+            # raise Exception("Stop")
+            delta = (torch.tensor(g) - self.get_state_value(state)).item()
+            delta2 = torch.tensor(g) - self.get_state_value(state)
+            baseline_loss += (delta2) ** 2
+
+            policy_loss += -log_prob * delta
+
+        # Backprogagation
+        self.baseline_optim.zero_grad()
+        baseline_loss.backward()
+        self.baseline_optim.step()
+
+        self.optim.zero_grad()
+        policy_loss.backward()
+        self.optim.step()
+
+    def save_model(self, path):
+        ensure_path_parents(path)
+        torch.save(self.policy_net.state_dict(), path + ".pth")
+        print("Saved model", path)
+
+    def load_model(self, path):
+        if os.path.exists(path):
+            self.policy_net.load_state_dict(torch.load(path))
+            print("Loaded model", path)
+        else:
+            print("Couldn't find model!")
+
+    def __repr__(self):
+        return f"PGNBaselineAgent(Policy:{self.policy_net.__repr__()},Baseline:{self.baseline_net.__repr__()})"

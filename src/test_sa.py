@@ -35,7 +35,7 @@ def test_pgm_sa(env, agent, episodes: int):
 
         done = False
         while not done:
-            action, a = agent.get_action(obs)
+            action, _ = agent.get_action(obs)
             next_obs, r, terminate, truncate, info = env.step(action)
             done = terminate or truncate
             rewards[episode] += r

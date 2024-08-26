@@ -1,11 +1,14 @@
 import os
 from typing import Any
+from pyparsing import FollowedBy
 import torch
 import torch.nn as nn
 import numpy as np
 
 from envs import ObsType, ActionType
 from utils import ensure_path_parents
+
+import copy
 
 from .Agent import Agent
 from .RandomAgentMA import random_choice
@@ -31,7 +34,13 @@ class Network(nn.Module):
 class DQNAgentMA(Agent):
     TRAIN: bool = True
 
-    def __init__(self, state_input_size, action_input_size, hidden_size, eps=0.1):
+    def __init__(
+        self,
+        state_input_size,
+        action_input_size,
+        hidden_size,
+        eps=0.1,
+    ):
         self.action_input_size = action_input_size
         self.q_net = Network(state_input_size + action_input_size, hidden_size, 1)
         self.optim = torch.optim.Adam(self.q_net.parameters())
@@ -125,3 +134,46 @@ def valid_actions_from_action_mask(action_mask: list[int]):
             valid_actions.append(action)
 
     return valid_actions
+
+
+class DQNAgentMA_Dummy(DQNAgentMA):
+    TRAIN: bool = False
+
+    def __init__(
+        self,
+        state_input_size,
+        action_input_size,
+        hidden_size,
+        parent_agent,
+        follow_rate=1000,
+    ):
+        self.action_input_size = action_input_size
+        self.q_net = None
+        self.parent_agent = parent_agent
+        self.num_episodes = 0
+        self.follow_rate = follow_rate
+
+    def update(self, obs, r, a, terminate, truncate, info):
+        done = terminate or truncate
+        if done:
+            self.num_episodes += 1
+
+        if self.num_episodes >= self.follow_rate:
+            self.num_episodes = 0
+            self.copy_model()
+
+    def get_action(self, obs: ObsType):
+        if not self.q_net:
+            action_mask = obs["action_mask"]
+            return random_choice(action_mask)
+        else:
+            return super().get_action(obs)
+
+    def copy_model(self):
+        self.q_net = copy.deepcopy(self.parent_agent.q_net)
+
+    def save_model(self):
+        pass
+
+    def __repr__(self):
+        return f"DQNAgentMA_Dummy :)"

@@ -22,6 +22,7 @@ def train_on_policy_ma(
 
     avg_total_reward = [0.0 for _ in range(env.max_num_agents)]
     for episode in tqdm(range(1, episodes + 1)):
+        rotate_list(agents)
         env.reset()
         total_reward = [0.0 for i in range(env.num_agents)]
 
