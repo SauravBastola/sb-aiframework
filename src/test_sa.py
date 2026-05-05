@@ -17,7 +17,7 @@ def test_sa(env, agent, episodes: int):
 
         done = False
         while not done:
-            action, a = agent.get_action(obs, [_ for _ in range(env.action_space.n)])
+            action = agent.get_action(obs, [_ for _ in range(env.action_space.n)])
             next_obs, r, terminate, truncate, info = env.step(action)
             done = terminate or truncate
             rewards[episode] += r
