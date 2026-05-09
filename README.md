@@ -69,10 +69,21 @@ PGN on CartPole after 300 training episodes:
 
 ![Reward histogram](docs/cartpole_rewards.png)
 
+### Other environments
+
+PGN agents on harder envs. These are not solved yet and show the agent still
+learning.
+
+| Taxi | Frozen Lake | Mountain Car |
+|:---:|:---:|:---:|
+| ![Taxi](docs/taxi.gif) | ![Frozen Lake](docs/frozen-lake.gif) | ![Mountain Car](docs/mountain-car.gif) |
+
 ## Known limitations
 
 - DQN has no replay buffer or target network, so it learns slowly. PGN works better.
 - Only discrete action spaces are supported.
+- Sparse-reward envs (taxi, frozen-lake, mountain-car) are not solved by the current agents.
+- `acrobot` crashes with the pinned `gymnasium 0.29.1` + `numpy 2.0` (`np.float_` was removed).
 
 ## License
 
